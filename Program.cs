@@ -1,0 +1,76 @@
+﻿#pragma warning disable
+
+// Add dependencies
+using System.Text.Json;
+using Spectre.Console;
+using System.Collections.Immutable;
+using System.Collections;
+using System.Reflection.Metadata.Ecma335;
+using static Utils;
+using Microsoft.SemanticKernel.Embeddings;
+using Azure.AI.OpenAI;
+using Azure.Identity;
+using Microsoft.Extensions.AI;
+using System.ClientModel;
+
+// Configure AI
+var ollamaEndpoint = "http://localhost:11434/";
+var openAIEndpoint = "https://luiscocoenriquezai.openai.azure.com/";
+
+var useOpenAI = true;
+var useManagedIdentity = false;
+
+IChatClient chatClient =
+    useOpenAI ?
+    Utils.CreateAzureOpenAIClient1(openAIEndpoint, useManagedIdentity)
+        .AsChatClient("gpt-4o")
+    : new OllamaChatClient(new Uri(ollamaEndpoint), "llama3.1");
+
+IEmbeddingGenerator<string,Embedding<float>> embeddingGenerator =
+    useOpenAI ?
+        Utils.CreateAzureOpenAIClient2(openAIEndpoint, useManagedIdentity)
+        .AsEmbeddingGenerator("text-embedding-ada-002") :
+        new OllamaEmbeddingGenerator(new Uri(ollamaEndpoint), "all-minilm");
+
+// Ingest manuals
+if(!File.Exists("./data/manual-chunks.json"))
+{
+    var manualIngestor = new ManualIngestor(embeddingGenerator);
+    await manualIngestor.RunAsync("./data/manuals", "./data");
+}
+
+// Load tickets and manuals
+var tickets = LoadTickets("./data/tickets.json");
+var manuals = LoadManualChunks("./data/manual-chunks.json");
+
+// Service configurations
+var summaryGenerator = new TicketSummarizer(chatClient);
+var productManualSearchService = new ProductManualSemanticSearch(embeddingGenerator, manuals);
+
+while(true)
+{
+    var prompt = 
+        AnsiConsole
+            .Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Enter a command")
+                    .PageSize(10)
+                    .MoreChoicesText("[grey](Move up and down to reveal more choices)[/]")
+                    .AddChoices(new[] {"Inspect ticket", "Quit"})
+            );
+
+    if(prompt == "Quit") break;
+
+    if(prompt == "Inspect ticket")
+    {
+        // No AI
+        //InspectTicket(tickets);
+
+        // With AI Summaries
+        //await InspectTicketWithAISummaryAsync(tickets, summaryGenerator);
+
+        // With Semantic Search 
+        await InspectTicketWithSemanticSearchAsync(tickets, summaryGenerator, productManualSearchService, chatClient);
+
+    }
+}
