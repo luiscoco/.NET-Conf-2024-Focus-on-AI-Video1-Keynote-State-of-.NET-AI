@@ -1,4 +1,8 @@
-# Customer Support 
+# .NET Conf 2024 - Focus on AI: Video 1 - Keynote State of .NET AI
+
+For more information about this sample view this Youtube video: 
+
+https://www.youtube.com/watch?v=0btB9W04y0Q&list=PLdo4fOcmZ0oX7Yg1cixIj6hXjz9C5MHJR
 
 This sample is a C# console application that uses Generative AI services like Ollama or Azure OpenAI to:
 
